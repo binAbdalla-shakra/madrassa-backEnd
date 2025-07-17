@@ -79,11 +79,11 @@ exports.createLesson = async (req, res) => {
 // Get lessons with filters (now by student)
 exports.getLessons = async (req, res) => {
     try {
-        const { student, teacher, surah_number, start_date, end_date, status, is_concluded } = req.query;
+        const { student_id, teacher, surah_number, start_date, end_date, status, is_concluded } = req.query;
 
         const query = {};
 
-        if (student) query.student = student;
+        if (student_id) query.student = student_id;
         if (teacher) query.teacher = teacher;
         if (surah_number) query.surah_number = surah_number;
         if (status) query.status = status;
@@ -97,7 +97,7 @@ exports.getLessons = async (req, res) => {
 
         const lessons = await Lesson.find(query)
             .populate('student', 'name')
-            .populate('teacher', 'name')
+            // .populate('teacher', 'name')
             .sort({ lessonDate: -1 });
 
         res.status(200).json({

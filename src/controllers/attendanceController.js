@@ -70,7 +70,7 @@ exports.getAttendance = async (req, res) => {
 
         const attendance = await Attendance.find(query)
             .populate('student', 'name')
-            .populate('teacher', 'name')
+            // .populate('teacher', 'name')
             .sort({ date: -1 });
 
         res.status(200).json({

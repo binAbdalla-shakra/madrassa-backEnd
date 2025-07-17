@@ -8,5 +8,9 @@ router.get('/', studentController.getAllStudents);
 router.get('/:id', studentController.getStudentById);
 router.put('/:id', studentController.updateStudent);
 router.delete('/:id', studentController.deleteStudent);
+router.post('/bulk-import', studentController.bulkImportStudents);
+
+
+
 
 module.exports = router;

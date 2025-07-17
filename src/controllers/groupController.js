@@ -173,7 +173,7 @@ exports.getUngroupedStudents = async (req, res) => {
       new mongoose.Types.ObjectId(s._id.toString())
     );
 
-    console.log("got",activeStudentObjectIds)
+    // console.log("got",activeStudentObjectIds)
     // Get students who are either:
     // 1. Not in any group at all, OR
     // 2. Only exist in groups with leaveDate set

@@ -6,7 +6,7 @@ const mongoose = require('mongoose');
 // Lesson Summary Report
 exports.getLessonSummary = async (req, res) => {
     try {
-        const { studentId, teacherId, startDate, endDate, status, isConcluded, surahNumber } = req.query;
+        const { studentId, teacherId, start_date, end_date, status, isConcluded, surahNumber } = req.query;
 
         const matchQuery = {};
 
@@ -16,10 +16,10 @@ exports.getLessonSummary = async (req, res) => {
         if (isConcluded !== undefined) matchQuery.is_concluded = isConcluded;
         if (surahNumber) matchQuery.surah_number = parseInt(surahNumber);
 
-        if (startDate || endDate) {
+        if (start_date || end_date) {
             matchQuery.lessonDate = {};
-            if (startDate) matchQuery.lessonDate.$gte = new Date(startDate);
-            if (endDate) matchQuery.lessonDate.$lte = new Date(endDate);
+            if (start_date) matchQuery.lessonDate.$gte = new Date(start_date);
+            if (end_date) matchQuery.lessonDate.$lte = new Date(end_date);
         }
 
         const summary = await Lesson.aggregate([
@@ -68,7 +68,7 @@ exports.getLessonSummary = async (req, res) => {
 // Lesson Detail Report
 exports.getLessonDetails = async (req, res) => {
     try {
-        const { studentId, teacherId, startDate, endDate, status, isConcluded, surahNumber } = req.query;
+        const { studentId, teacherId, start_date, end_date, status, isConcluded, surahNumber } = req.query;
 
         const matchQuery = {};
 
@@ -78,15 +78,15 @@ exports.getLessonDetails = async (req, res) => {
         if (isConcluded !== undefined) matchQuery.is_concluded = isConcluded;
         if (surahNumber) matchQuery.surah_number = parseInt(surahNumber);
 
-        if (startDate || endDate) {
+        if (start_date || end_date) {
             matchQuery.lessonDate = {};
-            if (startDate) matchQuery.lessonDate.$gte = new Date(startDate);
-            if (endDate) matchQuery.lessonDate.$lte = new Date(endDate);
+            if (start_date) matchQuery.lessonDate.$gte = new Date(start_date);
+            if (end_date) matchQuery.lessonDate.$lte = new Date(end_date);
         }
 
         const lessons = await Lesson.find(matchQuery)
-            .populate('student', 'name class')
-            .populate('teacher', 'name')
+            .populate('student', 'name')
+            // .populate('teacher', 'name')
             .sort({ lessonDate: -1 });
 
         // Group by surah for additional insights
@@ -184,7 +184,6 @@ exports.getLessonDetails = async (req, res) => {
 //     }
 // };
 
-
 exports.getStudentsWithoutLessons = async (req, res) => {
     try {
         const { date } = req.query;
@@ -196,10 +195,12 @@ exports.getStudentsWithoutLessons = async (req, res) => {
             });
         }
 
-        // Find all students
-        const allStudents = await Student.find({}).lean();
+        // 1. Find all active students and populate parent info
+        const allStudents = await Student.find({ isActive: true })
+            .populate('parent', 'name contactNumber')
+            .lean();
 
-        // Find students who have lessons on the specified date
+        // 2. Find students who have lessons on the specified date
         const studentsWithLessons = await Lesson.find({
             lessonDate: {
                 $gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
@@ -207,39 +208,54 @@ exports.getStudentsWithoutLessons = async (req, res) => {
             }
         }).distinct('student');
 
-        // Filter out students who have lessons from all students
+        // 3. Filter out students who have lessons
         const studentsWithoutLessons = allStudents.filter(student => 
             !studentsWithLessons.some(swl => swl.equals(student._id))
         );
 
-        // Get all group assignments for these students
+        // 4. Get all group assignments for these students with teacher info
         const groupAssignments = await GroupWithStudent.find({
-            studentIds: { $in: studentsWithoutLessons.map(s => s._id) }
-        }).populate('groupId');
+            'students.studentId': { 
+                $in: studentsWithoutLessons.map(s => s._id) 
+            },
+            'students.leaveDate': { $exists: false } // Only active group memberships
+        })
+        .populate('groupId', 'name teacherId')
+        .populate('groupId.teacherId', 'name')
+        .lean();
 
-        // Create a map of studentId to group name
-        const studentGroupMap = {};
-        groupAssignments.forEach(assignment => {
-            assignment.studentIds.forEach(studentId => {
-                if (!studentGroupMap[studentId]) {
-                    studentGroupMap[studentId] = assignment.groupId.name;
+        // 5. Create a map of student info with group and teacher details
+        const studentInfoMap = {};
+        
+        groupAssignments.forEach(group => {
+            group.students.forEach(student => {
+                if (!studentInfoMap[student.studentId] && !student.leaveDate) {
+                    studentInfoMap[student.studentId] = {
+                        groupName: group.groupId.name,
+                        teacherName: group.groupId.teacherId?.name || 'No teacher assigned'
+                    };
                 }
             });
         });
 
-        // Prepare the response data with group names
+        // 6. Prepare the comprehensive response
         const responseData = studentsWithoutLessons.map(student => ({
             _id: student._id,
             name: student.name,
-            groupName: studentGroupMap[student._id] || 'No group assigned', // Use group name instead of class
-            contact: student.contact,
+            parentName: student.parent?.name || 'No parent',
+            parentContact: student.parent?.contactNumber || 'No contact',
+            groupName: studentInfoMap[student._id]?.groupName || 'No group assigned',
+            teacherName: studentInfoMap[student._id]?.teacherName || '-',
+            // registrationNumber: student.registrationNumber,
             // Include any other relevant fields
         }));
 
         res.status(200).json({
             success: true,
-            data: responseData
+            data: responseData,
+            count: responseData.length
         });
+
     } catch (error) {
         res.status(500).json({
             success: false,

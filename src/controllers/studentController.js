@@ -1,22 +1,8 @@
 const Student = require('../models/Student');
-
+const Parent = require('../models/Parent');
 
 
 // Get All Students
-// exports.getAllStudents = async (req, res) => {
-//   try {
-//     const students = await Student.find()
-//       .populate({
-//         path: 'parent',
-//         select: 'name contactNumber' // Only include name and _id
-//       })
-
-//     res.json({success: true, data: students });
-//   } catch (error) {
-//     res.status(400).json({ error: error.message });
-//   }
-// };
-// Updated controller (studentsController.js)
 exports.getAllStudents = async (req, res) => {
   try {
     const { 
@@ -91,6 +77,110 @@ exports.createStudent = async (req, res) => {
       message: error.message || "Failed to create student",
     });
   }
+};
+
+
+exports.bulkImportStudents = async (req, res) => {
+    try {
+        const { studentsData, madrassaId, createdBy } = req.body;
+
+        if (!studentsData || !Array.isArray(studentsData)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid students data format' 
+            });
+        }
+
+        // 1. Process parent data - only find existing parents
+        const parentContacts = [];
+        const parentMap = {}; // {contactNumber: parentId}
+
+        // Extract unique parent contacts
+        studentsData.forEach(student => {
+            if (student.parentContactNumber) {
+                parentContacts.push(student.parentContactNumber);
+            }
+        });
+
+        // Find only existing parents
+        const existingParents = await Parent.find({
+            contactNumber: { $in: [...new Set(parentContacts)] },
+            madrassaId
+        });
+
+        // Create mapping of existing parents
+        existingParents.forEach(parent => {
+            parentMap[parent.contactNumber] = parent._id;
+        });
+
+        // 2. Prepare and create students (only those with known parents)
+        const createdStudents = [];
+        const skippedStudents = [];
+        const errors = [];
+        
+        for (const [index, student] of studentsData.entries()) {
+            try {
+                // Skip if parent contact provided but not found
+                if (student.parentContactNumber && !parentMap[student.parentContactNumber]) {
+                    skippedStudents.push({
+                        row: index + 1,
+                        name: student.name || 'Unknown',
+                        reason: `Parent with contact ${student.parentContactNumber} not found`
+                    });
+                    continue;
+                }
+
+                const studentDoc = {
+                    name: student.name,
+                    gender: student.gender,
+                    birthdate: student.birthdate,
+                    address: student.address,
+                    admissionDate: student.admissionDate || new Date(),
+                    // registrationNumber: student.registrationNumber,
+                    monthlyFee: student.monthlyFee || 15,
+                    madrassaId,
+                    createdBy,
+                    isActive: true,
+                    createdAt: new Date()
+                };
+
+                // Add parent reference if exists
+                if (student.parentContactNumber) {
+                    studentDoc.parent = parentMap[student.parentContactNumber];
+                }
+
+                const createdStudent = await Student.create(studentDoc);
+                createdStudents.push(createdStudent);
+            } catch (error) {
+                errors.push({
+                    row: index + 1,
+                    name: student.name || 'Unknown',
+                    error: error.message
+                });
+            }
+        }
+
+        // 3. Return results
+        res.json({
+            success: true,
+            message: 'Bulk import completed',
+            stats: {
+                totalProcessed: studentsData.length,
+                successCount: createdStudents.length,
+                skippedCount: skippedStudents.length,
+                errorCount: errors.length
+            },
+            skippedStudents: skippedStudents.length > 0 ? skippedStudents : undefined,
+            errors: errors.length > 0 ? errors : undefined
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Bulk import failed',
+            error: error.message
+        });
+    }
 };
 
 // Update Student

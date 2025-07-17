@@ -15,7 +15,7 @@ const lessonSchema = new mongoose.Schema({
     homework_assigned: { type: String },
     status: {
         type: String,
-        enum: ['completed', 'partial', 'postponed'],
+        enum: ['completed', 'repeated'],
         default: 'completed'
     },
     created_at: { type: Date, default: Date.now },
