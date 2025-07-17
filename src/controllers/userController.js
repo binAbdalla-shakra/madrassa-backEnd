@@ -4,17 +4,18 @@ const bcrypt = require('bcrypt'); // Add this line to import bcrypt
 // Create User
 exports.createUser = async (req, res) => {
     try {
-        const { username, password, email, roleId,CreatedBy } = req.body;
+        const { username, password, email, roleId,madrassaId,CreatedBy } = req.body;
 
         // Optionally, you may want to hash the password before saving
-         const hashedPassword = await bcrypt.hash(password, 10); 
+        //  const hashedPassword = await bcrypt.hash(password, 10); 
 
         const user = new User({
             username:username,
-            password:hashedPassword, // Use hashedPassword in production
-            // password: password,
+            // password:hashedPassword, // Use hashedPassword in production
+            password: password,
             email:email,
             roleId:roleId,
+            madrassaId: madrassaId,
             CreatedBy:CreatedBy,
         });
 
@@ -51,14 +52,14 @@ exports.updateUser = async (req, res) => {
         const { id } = req.params; // Get user ID from URL
         const updateData = { ...req.body };
 
-        // Check if the password field exists and is not empty
-        if (updateData.password && updateData.password.trim() !== '') {
-            // Hash the new password
-            updateData.password = await bcrypt.hash(updateData.password, 10);
-        } else {
-            // Remove the password field to retain the existing password
-            delete updateData.password;
-        }
+        // // Check if the password field exists and is not empty
+        // if (updateData.password && updateData.password.trim() !== '') {
+        //     // Hash the new password
+        //     updateData.password = await bcrypt.hash(updateData.password, 10);
+        // } else {
+        //     // Remove the password field to retain the existing password
+        //     delete updateData.password;
+        // }
 
         const updatedUser = await User.findByIdAndUpdate(id, updateData, { new: true });
 
@@ -84,4 +85,42 @@ exports.deleteUser = async (req, res) => {
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
+};
+
+
+
+
+
+// Login controller
+exports.signin = async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.body.username });
+    if (!user) {
+      return res.status(201).json({ status: "error", error: "Incorrect username!" });
+    }
+
+    // const isMatch = await bcrypt.compare(req.body.password, user.password);
+    const isMatch = req.body.password == user.password? true :false ;
+
+    if (!isMatch) {
+      return res.status(201).json({ status: "error", error: "Invalid password" });
+    }
+
+    // On success
+    res.status(200).json({
+      status: "success",  // ← Critical for frontend condition
+      data: {
+        user: {
+          _id: user._id,
+          username: user.username,
+          email: user.email,
+          madrassaId: user.madrassaId,
+          roleId: user.roleId
+        }
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ status: "error", error: "Server error" });
+  }
 };

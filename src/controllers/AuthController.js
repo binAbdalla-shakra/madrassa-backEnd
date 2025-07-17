@@ -26,34 +26,3 @@ const User = require('../models/User');
 //     }
 // };
 
-
-
-// Login controller
-exports.signin = async (req, res) => {
-  try {
-    const user = await User.findOne({ email: req.body.email });
-    if (!user) {
-      return res.status(404).json({ status: "error", error: "User not found" });
-    }
-
-    const isMatch = await bcrypt.compare(req.body.password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ status: "error", error: "Invalid password" });
-    }
-
-    // On success
-    res.status(200).json({
-      status: "success",  // ← Critical for frontend condition
-      data: {
-        user: {
-          _id: user._id,
-          username: user.username,
-          email: user.email
-        }
-      }
-    });
-
-  } catch (error) {
-    res.status(500).json({ status: "error", error: "Server error" });
-  }
-};

@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     email: { type: String, unique: true },
     roleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' }, // Reference to Role collection
+    madrassaId: { type: mongoose.Schema.Types.ObjectId, ref: 'madrassa', required: true },
     createdAt: { type: Date, default: Date.now },
     CreatedBy: { type: String, required: true },
     ModifiedAt:  Date,

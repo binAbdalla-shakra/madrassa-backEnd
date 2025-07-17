@@ -6,7 +6,14 @@ const madrassaRoutes = require('./routes/madrassaRoutes');
 const branchRoutes = require('./routes/branchRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const userRoutes = require('./routes/userRoutes');
-const authRoutes = require('./routes/AuthRoutes');
+// const authRoutes = require('./routes/AuthRoutes');
+const parentRoutes = require('./routes/parentRoutes');
+const studentRoutes = require('./routes/studentRoutes');
+const teacherRoutes = require('./routes/teacherRoutes');
+const groupRoutes = require('./routes/groupRoutes');
+const lessonTrackingRoutes = require('./routes/lessonTrackingRoutes');
+
+
 
 const customerRoutes = require('./routes/customerRoutes');
 
@@ -22,7 +29,24 @@ app.use('/api/madrassa', madrassaRoutes);
 app.use('/api/branches', branchRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/auth', authRoutes);
+// app.use('/api/auth', authRoutes);
+
+app.use('/api/parents', parentRoutes);
+app.use('/api/students', studentRoutes);
+app.use('/api/teachers', teacherRoutes);
+app.use('/api/groups', groupRoutes);
+
+// app.use('/api/lessons', lessonTrackingRoutes);
+// app.use('/api/attendances', lessonTrackingRoutes);
+
+
+app.use('/api/finance', require('./routes/financeRoutes'));
+app.use('/api/expense-types', require('./routes/expenseTypeRoutes'));
+app.use('/api/expenses', require('./routes/expenseRoutes'));
+app.use('/api/attendance', require('./routes/attendanceRoutes'));
+app.use('/api/lessons', require('./routes/lessonRoutes'));
+app.use('/api/reports', require('./routes/reportRoutes'));
+
 
 app.use('/api/customers', customerRoutes);
 //app.use('/api/plans', planRoutes);
