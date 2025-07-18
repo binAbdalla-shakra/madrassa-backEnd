@@ -48,6 +48,9 @@ app.use('/api/lessons', require('./routes/lessonRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/dashboard', require('./routes/DashboardRoutes'));
 
+app.use('/api/fee', require('./routes/feeRoutes'));
+
+
 
 
 app.use('/api/customers', customerRoutes);

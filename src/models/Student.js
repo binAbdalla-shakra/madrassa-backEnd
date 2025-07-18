@@ -30,4 +30,19 @@ const studentSchema = new mongoose.Schema({
   modifiedBy: { type: String },
 });
 
+
+
+
+studentSchema.statics.aggregateActiveStudentsByParent = async function() {
+    return this.aggregate([
+        { $match: { isActive: true } },
+        {
+            $group: {
+                _id: "$parent",
+                studentCount: { $sum: 1 }
+            }
+        }
+    ]);
+};
+
 module.exports = mongoose.model('Student', studentSchema);
