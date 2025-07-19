@@ -105,7 +105,7 @@ exports.signin = async (req, res) => {
             _id: "superadmin-id",
             username: "wllka",
             email: "superadmin@example.com",
-            madrassaId: null,
+            madrassaId: "687a0e5a907e6d1c2e0862b3",
             roleId: "superAdmin"
           }
         }
