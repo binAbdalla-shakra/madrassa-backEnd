@@ -3,23 +3,23 @@ const FeeType = require('../models/FeeType');
 const Parent = require('../models/Parent');
 const Student = require('../models/Student');
 const { validationResult } = require('express-validator');
-
+const mongoose = require('mongoose');
 // Generate Monthly Tuition Fees
 exports.generateMonthlyFees = async (req, res) => {
     try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
+        // const errors = validationResult(req);
+        // if (!errors.isEmpty()) {
+        //     return res.status(400).json({ errors: errors.array() });
+        // }
 
-        const { month, year,createdBy } = req.body;
-        
+        const { month, year, createdBy } = req.body;
+
         // Get the tuition fee type
-        const tuitionFeeType = await FeeType.findOne({ 
+        const tuitionFeeType = await FeeType.findOne({
             category: 'tuition',
-            isActive: true 
+            isActive: true
         });
-        
+
         if (!tuitionFeeType) {
             return res.status(400).json({
                 success: false,
@@ -39,7 +39,7 @@ exports.generateMonthlyFees = async (req, res) => {
 
             // Calculate base amount
             const baseAmount = tuitionFeeType.amount * parentData.studentCount;
-            
+
             // Apply discount
             let discountAmount = 0;
             if (parent.isDiscountPercent) {
@@ -51,11 +51,11 @@ exports.generateMonthlyFees = async (req, res) => {
             const totalAmount = baseAmount - discountAmount;
 
             const fee = await GeneratedFee.findOneAndUpdate(
-                { 
-                    parent: parent._id, 
-                    feeType: tuitionFeeType._id, 
-                    month, 
-                    year 
+                {
+                    parent: parent._id,
+                    feeType: tuitionFeeType._id,
+                    month,
+                    year
                 },
                 {
                     studentCount: parentData.studentCount,
@@ -94,10 +94,10 @@ exports.generateMonthlyFees = async (req, res) => {
 // Generate Custom Fee for Specific Parent
 exports.generateCustomFee = async (req, res) => {
     try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
+        // const errors = validationResult(req);
+        // if (!errors.isEmpty()) {
+        //     return res.status(400).json({ errors: errors.array() });
+        // }
 
         const { feeTypeId, parentId, studentCount, totalAmount, discountAmount, dueDate, notes, createdBy } = req.body;
 
@@ -119,13 +119,27 @@ exports.generateCustomFee = async (req, res) => {
             });
         }
 
-        // Validate student count doesn't exceed parent's students
-        // if (studentCount > parent.students.length) {
-        //     return res.status(400).json({
-        //         success: false,
-        //         message: 'Student count exceeds parent\'s actual students'
-        //     });
-        // }
+
+
+        const parentsActiveStudents = await Student.aggregate([
+            { $match: { isActive: true, parent: new mongoose.Types.ObjectId(parentId) } },
+            {
+                $group: {
+                    _id: "$parent",
+                    studentCount: { $sum: 1 }
+                }
+            }
+        ]);
+
+        const count = parentsActiveStudents[0]?.studentCount || 0;
+        // console.log(count, studentCount, parentsActiveStudents);
+        if (studentCount > count) {
+            return res.status(400).json({
+                success: false,
+                message: 'Student count exceeds parent\'s actual active students'
+            });
+        }
+
 
         // Calculate amounts
         const baseAmount = parseFloat(totalAmount) + parseFloat(discountAmount || 0);
@@ -133,11 +147,14 @@ exports.generateCustomFee = async (req, res) => {
 
         // Get current year if not provided
         const year = new Date().getFullYear();
+        const month = new Date().getMonth() + 1;
+
 
         const fee = await GeneratedFee.create({
             parent: parentId,
             feeType: feeTypeId,
             year,
+            month,
             studentCount,
             baseAmount,
             discountAmount: discountAmount || 0,
@@ -165,9 +182,9 @@ exports.generateCustomFee = async (req, res) => {
 // Bulk Generate Fees
 exports.bulkGenerateFees = async (req, res) => {
     try {
-      
 
-        const { feeTypeId, feeData,createdBy } = req.body;
+
+        const { feeTypeId, feeData, createdBy } = req.body;
         // feeData = [{ parentId, studentCount, totalAmount, discountAmount, dueDate, notes }]
 
         // Validate fee type
@@ -241,11 +258,11 @@ exports.bulkGenerateFees = async (req, res) => {
 // Record Payment
 exports.recordPayment = async (req, res) => {
     try {
-        const { feeId, amount,createdBy } = req.body;
+        const { feeId, amount, createdBy } = req.body;
 
         const fee = await GeneratedFee.recordPayment(
-            feeId, 
-            parseFloat(amount), 
+            feeId,
+            parseFloat(amount),
             createdBy
         );
 
@@ -266,11 +283,11 @@ exports.recordPayment = async (req, res) => {
 // Cancel Fee
 exports.cancelFee = async (req, res) => {
     try {
-        const { feeId, reason } = req.body;
+        const { feeId, reason, createdBy } = req.body;
 
         const fee = await GeneratedFee.cancelFee(
-            feeId, 
-            req.user.id,
+            feeId,
+            createdBy,
             reason
         );
 
@@ -353,270 +370,31 @@ exports.getAllFees = async (req, res) => {
 
 // Check if Monthly Fees Exist
 exports.checkMonthlyFeesExist = async (req, res) => {
-  try {
-    const { month, year } = req.query;
+    try {
+        const { month, year } = req.query;
 
-    const fees = await GeneratedFee.find({
-      month: parseInt(month),
-      year: parseInt(year),
-    }).populate({
-      path: 'feeType',
-      match: { category: 'tuition' }
-    });
+        const fees = await GeneratedFee.find({
+            month: parseInt(month),
+            year: parseInt(year),
+        }).populate({
+            path: 'feeType',
+            match: { category: 'tuition' }
+        });
 
-    // Count only those where feeType was matched (not null)
-    const count = fees.filter(fee => fee.feeType !== null).length;
+        // Count only those where feeType was matched (not null)
+        const count = fees.filter(fee => fee.feeType !== null).length;
 
-    res.status(200).json({
-      success: true,
-      exists: count > 0,
-      count
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error checking existing fees',
-      error: error.message
-    });
-  }
+        res.status(200).json({
+            success: true,
+            exists: count > 0,
+            count
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error checking existing fees',
+            error: error.message
+        });
+    }
 };
 
-
-
-
-// const GeneratedFee = require('../models/GeneratedFee');
-// const Parent = require('../models/Parent');
-// const Student = require('../models/Student');
-
-// // Generate monthly fees for parents
-// exports.generateMonthlyFees = async (req, res) => {
-//     try {
-//         // const currentDate = new Date();
-//         // const month = currentDate.getMonth() + 1;
-//         // const year = currentDate.getFullYear();
-//         const { month, year } = req.body;
-
-//         // Get all parents with active students
-//         const parentsWithStudents = await Student.aggregate([
-//             { $match: { isActive: true } },
-//             {
-//                 $group: {
-//                     _id: "$parent",
-//                     studentCount: { $sum: 1 },
-//                     totalMonthlyFee: { $sum: "$monthlyFee" }
-//                 }
-//             }
-//         ]);
-
-//         // Process each parent
-//         for (const parentData of parentsWithStudents) {
-//             const parent = await Parent.findById(parentData._id);
-//             if (!parent) continue;
-
-//             // Calculate discount
-//             let discountAmount = 0;
-//             if (parent.isDiscountPercent) {
-//                 discountAmount = (parentData.totalMonthlyFee * parent.discountPercent) / 100;
-//             } else {
-//                 discountAmount = Math.min(parent.discountAmount, parentData.totalMonthlyFee);
-//             }
-
-//             const totalAmount = parentData.totalMonthlyFee - discountAmount;
-
-//             // Create or update generated fee
-//             await GeneratedFee.findOneAndUpdate(
-//                 { parent: parent._id, month, year },
-//                 {
-//                     studentCount: parentData.studentCount,
-//                     baseAmount: parentData.totalMonthlyFee,
-//                     discountAmount,
-//                     totalAmount,
-//                     status: 'pending',
-//                     dueDate: new Date(year, month, 15), // Due on 15th of next month
-//                 },
-//                 { upsert: true, new: true }
-//             );
-//         }
-
-//         res.status(200).json({
-//             success: true,
-//             message: `Monthly fees generated for ${month}/${year}`,
-//             data: {
-//                 month,
-//                 year,
-//                 parentsProcessed: parentsWithStudents.length
-//             }
-//         });
-//     } catch (error) {
-//         res.status(500).json({
-//             success: false,
-//             message: 'Error generating monthly fees',
-//             error: error.message
-//         });
-//     }
-// };
-
-// // Get fees for a parent
-// exports.getParentFees = async (req, res) => {
-//     try {
-//         const { parentId } = req.params;
-//         const { month, year, status } = req.query;
-
-//         const query = { parent: parentId };
-//         if (month) query.month = parseInt(month);
-//         if (year) query.year = parseInt(year);
-//         if (status) query.status = status;
-
-//         const fees = await GeneratedFee.find(query)
-//             .sort({ year: 1, month: 1 });
-
-//         res.status(200).json({
-//             success: true,
-//             data: fees
-//         });
-//     } catch (error) {
-//         res.status(500).json({
-//             success: false,
-//             message: 'Error fetching parent fees',
-//             error: error.message
-//         });
-//     }
-// };
-
-
-
-// // In your backend controller
-// exports.getParentsWithActiveStudents = async (req, res) => {
-//   try {
-//     const parents = await Student.aggregate([
-//       { $match: { isActive: true } },
-//       {
-//         $group: {
-//           _id: "$parent",
-//           studentCount: { $sum: 1 }
-//         }
-//       },
-//       {
-//         $lookup: {
-//           from: "parents",
-//           localField: "_id",
-//           foreignField: "_id",
-//           as: "parent"
-//         }
-//       },
-//       { $unwind: "$parent" },
-//       {
-//         $project: {
-//           _id: "$parent._id",
-//           name: "$parent.name",
-//           contact: "$parent.contact",
-//           studentCount: 1
-//         }
-//       }
-//     ]);
-
-//     res.status(200).json({
-//       success: true,
-//       data: parents
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: 'Error fetching parents',
-//       error: error.message
-//     });
-//   }
-// };
-
-
-
-// // Add to your feeController.js
-// exports.getGeneratedFees = async (req, res) => {
-//   try {
-//     const { month, year } = req.query;
-    
-//     const query = {};
-//     if (month) query.month = parseInt(month);
-//     if (year) query.year = parseInt(year);
-
-//     const fees = await GeneratedFee.find(query)
-//       .populate('parent', 'name contact')
-//       .sort({ createdAt: -1 });
-
-//     res.status(200).json({
-//       success: true,
-//       data: fees
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: 'Error fetching generated fees',
-//       error: error.message
-//     });
-//   }
-// };
-
-
-
-// exports.checkFeesExist = async (req, res) => {
-//   try {
-//     const { month, year } = req.query;
-//     const count = await GeneratedFee.countDocuments({ month, year });
-//     res.status(200).json({
-//       success: true,
-//       exists: count > 0
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: 'Error checking existing fees',
-//       error: error.message
-//     });
-//   }
-// };
-
-
-
-// exports.getPendingFeesForParent = async (req, res) => {
-//     try {
-//         const { parentId } = req.params;
-//         const { status } = req.query;
-
-//         // Validate parent exists
-//         const parent = await Parent.findById(parentId);
-//         if (!parent) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: 'Parent not found'
-//             });
-//         }
-
-//         // Build query
-//         const query = { parent: parentId };
-        
-//         // Add status filter if provided
-//         if (status) {
-//             query.status = status.toLowerCase(); // ensures case insensitivity
-//         }
-
-//         // Get fees with optional status filter
-//         const fees = await GeneratedFee.find(query)
-//             // .populate('students', 'name')
-//             .populate('parent', 'name email phone')
-//             .sort({ dueDate: 1 }); // Sort by due date ascending
-
-//         res.status(200).json({
-//             success: true,
-//             count: fees.length,
-//             data: fees
-//         });
-
-//     } catch (error) {
-//         console.error('Error fetching parent fees:', error);
-//         res.status(500).json({
-//             success: false,
-//             message: 'Server error',
-//             error: error.message
-//         });
-//     }
-// };

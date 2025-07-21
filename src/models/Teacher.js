@@ -2,15 +2,15 @@ const mongoose = require('mongoose');
 
 const teacherSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  email: { type: String,  sparse: true },
+  email: { type: String, sparse: true },
   contactNumber: { type: String, unique: true, required: true },
   address: String,
   gender: { type: String, enum: ['Male', 'Female'], required: true },
 
   // Optional: Subject/Designation
   specialization: { type: String },
-  shift: {type: String, enum: ['Morning','Afternoon']},
-  baseSalary :{type: Number, required: true},
+  shift: { type: String, enum: ['Morning', 'Afternoon', "FullTime"] },
+  baseSalary: { type: Number, required: true },
 
   // Multi-Company support
   madrassaId: { type: mongoose.Schema.Types.ObjectId, ref: 'madrassa', required: true },

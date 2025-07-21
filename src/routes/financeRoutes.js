@@ -21,9 +21,13 @@ router.get('/parents/:parentId/receipts', receiptController.getParentReceipts);
 router.get('/parents/:parentId/reports/monthly', reportController.getParentMonthlyReport);
 
 
+
 // // Finance report routes
 router.get('/expenses', reportController.getExpenseReport);
 router.get('/summary', reportController.getFinanceSummary);
 router.get('/details', reportController.getFinanceDetails);
+
+router.get('/monthly-finance', reportController.getMonthlyFinanceSummary);
+
 
 module.exports = router;

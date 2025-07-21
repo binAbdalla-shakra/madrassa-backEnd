@@ -40,8 +40,8 @@ exports.createReceipt = async (req, res) => {
 
         // Update fee status and paid amount
         try {
-            const updatedFee = await GeneratedFee.updatePayment(feeId, amountPaid);
-            console.log(`Updated fee status to: ${updatedFee.status}`);
+            const updatedFee = await GeneratedFee.recordPayment(feeId, amountPaid, receivedBy);
+            // console.log(`Updated fee status to: ${updatedFee.status}`);
         } catch (error) {
             console.error('Error updating fee status:', error);
             // Handle error if needed

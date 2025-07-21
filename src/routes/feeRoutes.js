@@ -17,7 +17,7 @@ router.post('/fees/generate-monthly', feeController.generateMonthlyFees);
 router.post('/fees/generate-custom', feeController.generateCustomFee);
 router.post('/fees/bulk-generate', feeController.bulkGenerateFees);
 router.post('/fees/:id/payment', feeController.recordPayment);
-router.post('/fees/:id/cancel', feeController.cancelFee);
+router.post('/fees/cancel', feeController.cancelFee);
 
 // Fee Retrieval Routes
 router.get('/fees/parent/:parentId', feeController.getParentFees);

@@ -6,26 +6,209 @@ const mongoose = require('mongoose');
 const Expense = require('../models/Expense');
 const ExpenseType = require('../models/ExpenseType');
 // Get parent monthly finance report
+// exports.getParentMonthlyReport = async (req, res) => {
+//     try {
+//         const { parentId } = req.params;
+
+//         // 1. Get all generated fees for this parent
+//         const generatedFees = await GeneratedFee.aggregate([
+//             { $match: { parent: new mongoose.Types.ObjectId(parentId) } },
+//             {
+//                 $group: {
+//                     _id: { month: '$month', year: '$year' },
+//                     generatedAmount: { $sum: '$totalAmount' },
+//                     feeCount: { $sum: 1 }
+//                 }
+//             },
+//             { $sort: { '_id.year': 1, '_id.month': 1 } }
+//         ]);
+
+//         // 2. Get all receipts for this parent grouped by payment month
+//         const receipts = await Receipt.aggregate([
+//             { $match: { parent: new mongoose.Types.ObjectId(parentId) } },
+//             {
+//                 $group: {
+//                     _id: {
+//                         month: { $month: '$paymentDate' },
+//                         year: { $year: '$paymentDate' }
+//                     },
+//                     receiptedAmount: { $sum: '$amountPaid' },
+//                     receiptCount: { $sum: 1 }
+//                 }
+//             },
+//             { $sort: { '_id.year': 1, '_id.month': 1 } }
+//         ]);
+
+//         // 3. Combine all months with activity
+//         const allMonths = new Set();
+
+//         // Add months with generated fees
+//         generatedFees.forEach(f => {
+//             allMonths.add(`${f._id.year}-${f._id.month.toString().padStart(2, '0')}`);
+//         });
+
+//         // Add months with receipts
+//         receipts.forEach(r => {
+//             allMonths.add(`${r._id.year}-${r._id.month.toString().padStart(2, '0')}`);
+//         });
+
+//         // 4. Create monthly summary with running balance
+//         let runningBalance = 0;
+//         const monthlyReport = Array.from(allMonths)
+//             .sort()
+//             .map(monthYear => {
+//                 const [year, month] = monthYear.split('-');
+//                 const monthInt = parseInt(month);
+//                 const yearInt = parseInt(year);
+
+//                 // Find generated amount for this month
+//                 const generated = generatedFees.find(f =>
+//                     f._id.month === monthInt && f._id.year === yearInt
+//                 );
+
+//                 // Find receipted amount for this month (payments made in this month)
+//                 const receipted = receipts.find(r =>
+//                     r._id.month === monthInt && r._id.year === yearInt
+//                 );
+
+//                 const monthGenerated = generated?.generatedAmount || 0;
+//                 const monthReceipted = receipted?.receiptedAmount || 0;
+
+//                 runningBalance += monthGenerated - monthReceipted;
+
+//                 return {
+//                     month: monthInt,
+//                     year: yearInt,
+//                     monthName: new Date(yearInt, monthInt - 1).toLocaleString('default', { month: 'long' }),
+//                     generatedAmount: monthGenerated,
+//                     receiptedAmount: monthReceipted,
+//                     balance: runningBalance
+//                 };
+//             });
+
+//         // 5. Get parent details
+//         const parent = await Parent.findById(parentId);
+//         const activeStudents = await Student.countDocuments({
+//             parent: parentId,
+//             isActive: true
+//         });
+
+//         res.status(200).json({
+//             success: true,
+//             data: {
+//                 parent: {
+//                     _id: parent._id,
+//                     name: parent.name,
+//                     contact: parent.contactNumber,
+//                     discount: parent.isDiscountPercent ?
+//                         `${parent.discountPercent}%` :
+//                         `$${parent.discountAmount.toFixed(2)}`,
+//                     activeStudents
+//                 },
+//                 monthlyReport,
+//                 finalBalance: runningBalance,
+//                 asText: generateTextReport(parent, activeStudents, monthlyReport)
+//             }
+//         });
+//     } catch (error) {
+//         res.status(500).json({
+//             success: false,
+//             message: 'Error generating report',
+//             error: error.message
+//         });
+//     }
+// };
+
+// // Helper function to generate text report
+// function generateTextReport(parent, activeStudents, monthlyData) {
+//     let reportText = `Financial Report for ${parent.name}\n`;
+//     reportText += `Contact: ${parent.contactNumber}\n`;
+//     reportText += `Active Students: ${activeStudents}\n`;
+//     reportText += `Discount: ${parent.isDiscountPercent? `${parent.discountPercent}%` :
+//                         `$${parent.discountAmount.toFixed(2)}`}\n\n`;
+
+//     monthlyData.forEach(month => {
+//         reportText += `Generated $${month.generatedAmount.toFixed(2)} in ${month.monthName}, `;
+//         reportText += `Receipted $${month.receiptedAmount.toFixed(2)} in ${month.monthName}\n`;
+//     });
+
+//     reportText += `\nFinal Balance: $${monthlyData.length > 0 ?
+//         monthlyData[monthlyData.length - 1].balance.toFixed(2) : '0.00'}`;
+
+//     return reportText;
+// }
+
 exports.getParentMonthlyReport = async (req, res) => {
     try {
         const { parentId } = req.params;
 
-        // 1. Get all generated fees for this parent
+        // 1. Get all generated fees for this parent with details
         const generatedFees = await GeneratedFee.aggregate([
             { $match: { parent: new mongoose.Types.ObjectId(parentId) } },
+            {
+                $lookup: {
+                    from: 'feetypes',
+                    localField: 'feeType',
+                    foreignField: '_id',
+                    as: 'feeType'
+                }
+            },
+            { $unwind: '$feeType' },
             {
                 $group: {
                     _id: { month: '$month', year: '$year' },
                     generatedAmount: { $sum: '$totalAmount' },
-                    feeCount: { $sum: 1 }
+                    feeCount: { $sum: 1 },
+                    fees: {
+                        $push: {
+                            _id: '$_id',
+                            feeType: '$feeType.name',
+                            baseAmount: '$baseAmount',
+                            discountAmount: '$discountAmount',
+                            totalAmount: '$totalAmount',
+                            paidAmount: '$paidAmount',
+                            status: '$status',
+                            dueDate: '$dueDate',
+                            month: '$month',
+                            year: '$year'
+                        }
+                    }
                 }
             },
             { $sort: { '_id.year': 1, '_id.month': 1 } }
         ]);
 
-        // 2. Get all receipts for this parent grouped by payment month
+        // 2. Get all receipts for this parent with the fees they paid
         const receipts = await Receipt.aggregate([
             { $match: { parent: new mongoose.Types.ObjectId(parentId) } },
+            {
+                $lookup: {
+                    from: 'generatedfees',
+                    localField: 'fee',
+                    foreignField: '_id',
+                    as: 'paidFee'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$paidFee',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $lookup: {
+                    from: 'feetypes',
+                    localField: 'paidFee.feeType',
+                    foreignField: '_id',
+                    as: 'paidFee.feeType'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$paidFee.feeType',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
             {
                 $group: {
                     _id: {
@@ -33,7 +216,49 @@ exports.getParentMonthlyReport = async (req, res) => {
                         year: { $year: '$paymentDate' }
                     },
                     receiptedAmount: { $sum: '$amountPaid' },
-                    receiptCount: { $sum: 1 }
+                    receiptCount: { $sum: 1 },
+                    receipts: {
+                        $push: {
+                            _id: '$_id',
+                            receiptNumber: '$receiptNumber',
+                            paymentDate: '$paymentDate',
+                            paymentMethod: '$paymentMethod',
+                            amountPaid: '$amountPaid',
+                            paidFee: {
+                                $cond: [
+                                    { $ifNull: ['$paidFee._id', false] },
+                                    {
+                                        feeId: '$paidFee._id',
+                                        feeType: '$paidFee.feeType.name',
+                                        feeMonth: '$paidFee.month',
+                                        feeYear: '$paidFee.year',
+                                        feeAmount: '$paidFee.totalAmount'
+                                    },
+                                    null
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                $project: {
+                    receiptedAmount: 1,
+                    receiptCount: 1,
+                    receipts: {
+                        $map: {
+                            input: '$receipts',
+                            as: 'receipt',
+                            in: {
+                                _id: '$$receipt._id',
+                                receiptNumber: '$$receipt.receiptNumber',
+                                paymentDate: '$$receipt.paymentDate',
+                                paymentMethod: '$$receipt.paymentMethod',
+                                amountPaid: '$$receipt.amountPaid',
+                                paidFee: '$$receipt.paidFee'
+                            }
+                        }
+                    }
                 }
             },
             { $sort: { '_id.year': 1, '_id.month': 1 } }
@@ -52,7 +277,7 @@ exports.getParentMonthlyReport = async (req, res) => {
             allMonths.add(`${r._id.year}-${r._id.month.toString().padStart(2, '0')}`);
         });
 
-        // 4. Create monthly summary with running balance
+        // 4. Create monthly summary with running balance and detailed payment info
         let runningBalance = 0;
         const monthlyReport = Array.from(allMonths)
             .sort()
@@ -82,7 +307,9 @@ exports.getParentMonthlyReport = async (req, res) => {
                     monthName: new Date(yearInt, monthInt - 1).toLocaleString('default', { month: 'long' }),
                     generatedAmount: monthGenerated,
                     receiptedAmount: monthReceipted,
-                    balance: runningBalance
+                    balance: runningBalance,
+                    generatedFees: generated?.fees || [],
+                    receipts: receipted?.receipts || []
                 };
             });
 
@@ -111,6 +338,7 @@ exports.getParentMonthlyReport = async (req, res) => {
             }
         });
     } catch (error) {
+        console.error('Error generating report:', error);
         res.status(500).json({
             success: false,
             message: 'Error generating report',
@@ -119,26 +347,53 @@ exports.getParentMonthlyReport = async (req, res) => {
     }
 };
 
-// Helper function to generate text report
+// Enhanced helper function to generate text report
 function generateTextReport(parent, activeStudents, monthlyData) {
     let reportText = `Financial Report for ${parent.name}\n`;
     reportText += `Contact: ${parent.contactNumber}\n`;
     reportText += `Active Students: ${activeStudents}\n`;
-    reportText += `Discount: ${parent.isDiscountPercent? `${parent.discountPercent}%` :
-                        `$${parent.discountAmount.toFixed(2)}`}\n\n`;
+    reportText += `Discount: ${parent.isDiscountPercent ? `${parent.discountPercent}%` :
+        `$${parent.discountAmount.toFixed(2)}`}\n\n`;
 
     monthlyData.forEach(month => {
-        reportText += `Generated $${month.generatedAmount.toFixed(2)} in ${month.monthName}, `;
-        reportText += `Receipted $${month.receiptedAmount.toFixed(2)} in ${month.monthName}\n`;
+        reportText += `=== ${month.monthName} ${month.year} ===\n`;
+        reportText += `Generated: $${month.generatedAmount.toFixed(2)}\n`;
+
+        // Show generated fees details
+        if (month.generatedFees.length > 0) {
+            reportText += `  Generated Fees:\n`;
+            month.generatedFees.forEach(fee => {
+                reportText += `  - ${fee.feeType}: $${fee.totalAmount.toFixed(2)}`;
+                reportText += ` (Base: $${fee.baseAmount.toFixed(2)}, Discount: $${fee.discountAmount.toFixed(2)})`;
+                reportText += ` | Status: ${fee.status}\n`;
+            });
+        }
+
+        reportText += `Receipted: $${month.receiptedAmount.toFixed(2)}\n`;
+
+        // Show receipt details
+        if (month.receipts.length > 0) {
+            reportText += `  Receipts:\n`;
+            month.receipts.forEach(receipt => {
+                reportText += `  - Receipt #${receipt.receiptNumber}: $${receipt.amountPaid.toFixed(2)}`;
+                reportText += ` (${receipt.paymentMethod}, ${receipt.paymentDate.toISOString().split('T')[0]})\n`;
+
+                // Show which fee was paid by this receipt
+                if (receipt.paidFee) {
+                    reportText += `    * Paid for ${receipt.paidFee.feeType} `;
+                    reportText += `(${receipt.paidFee.feeMonth}/${receipt.paidFee.feeYear})\n`;
+                }
+            });
+        }
+
+        reportText += `Balance: $${month.balance.toFixed(2)}\n\n`;
     });
 
-    reportText += `\nFinal Balance: $${monthlyData.length > 0 ?
-        monthlyData[monthlyData.length - 1].balance.toFixed(2) : '0.00'}`;
+    reportText += `=== FINAL BALANCE ===\n`;
+    reportText += `$${monthlyData.length > 0 ? monthlyData[monthlyData.length - 1].balance.toFixed(2) : '0.00'}`;
 
     return reportText;
 }
-
-
 // Monthly Expense Report
 exports.getExpenseReport = async (req, res) => {
     try {
@@ -335,6 +590,95 @@ exports.getFinanceDetails = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error generating finance details',
+            error: error.message
+        });
+    }
+};
+
+
+exports.getMonthlyFinanceSummary = async (req, res) => {
+    try {
+        const currentYear = new Date().getFullYear();
+
+        const yearStart = new Date(currentYear, 0, 1);
+        const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59);
+
+        // Receipt: Revenue grouped by month
+        const revenueByMonth = await Receipt.aggregate([
+            {
+                $match: {
+                    paymentDate: { $gte: yearStart, $lte: yearEnd }
+                }
+            },
+            {
+                $group: {
+                    _id: { month: { $month: "$paymentDate" } },
+                    revenue: { $sum: "$amountPaid" }
+                }
+            }
+        ]);
+
+        // Expense: Expenses grouped by month
+        const expenseByMonth = await Expense.aggregate([
+            {
+                $match: {
+                    date: { $gte: yearStart, $lte: yearEnd }
+                }
+            },
+            {
+                $group: {
+                    _id: { month: { $month: "$date" } },
+                    expenses: { $sum: "$amount" }
+                }
+            }
+        ]);
+
+        // Build a merged map from both datasets
+        const monthlyMap = {};
+
+        // Fill revenue data
+        revenueByMonth.forEach(entry => {
+            const month = entry._id.month;
+            monthlyMap[month] = {
+                month,
+                revenue: entry.revenue,
+                expenses: 0
+            };
+        });
+
+        // Fill expenses data (merge into map)
+        expenseByMonth.forEach(entry => {
+            const month = entry._id.month;
+            if (!monthlyMap[month]) {
+                monthlyMap[month] = {
+                    month,
+                    revenue: 0,
+                    expenses: entry.expenses
+                };
+            } else {
+                monthlyMap[month].expenses = entry.expenses;
+            }
+        });
+
+        // Ensure all 12 months are present
+        const monthly = [];
+        for (let i = 1; i <= 12; i++) {
+            monthly.push({
+                month: i,
+                revenue: monthlyMap[i]?.revenue || 0,
+                expenses: monthlyMap[i]?.expenses || 0
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            monthly
+        });
+    } catch (error) {
+        console.error("Error in getMonthlyFinanceSummary:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error generating monthly finance summary",
             error: error.message
         });
     }

@@ -1,54 +1,59 @@
+const { CancellationToken } = require('mongodb');
 const mongoose = require('mongoose');
 
 const generatedFeeSchema = new mongoose.Schema({
-    parent: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Parent', 
-        required: true 
+    parent: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Parent',
+        required: true
     },
-    feeType: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'FeeType', 
-        required: true 
+    feeType: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'FeeType',
+        required: true
     },
-    month: { 
-        type: Number, 
-        min: 1, 
-        max: 12 
+    month: {
+        type: Number,
+        min: 1,
+        max: 12
     },
-    year: { 
-        type: Number, 
-        required: true 
+    year: {
+        type: Number,
+        required: true
     },
-    studentCount: { 
-        type: Number, 
-        min: 1 
+    studentCount: {
+        type: Number,
+        min: 1
     },
-    baseAmount: { 
-        type: Number, 
-        required: true 
+    baseAmount: {
+        type: Number,
+        required: true
     },
-    discountAmount: { 
-        type: Number, 
-        default: 0 
+    discountAmount: {
+        type: Number,
+        default: 0
     },
-    totalAmount: { 
-        type: Number, 
-        required: true 
+    totalAmount: {
+        type: Number,
+        required: true
     },
-    paidAmount: { 
-        type: Number, 
-        default: 0 
+    paidAmount: {
+        type: Number,
+        default: 0
     },
     status: {
         type: String,
         enum: ['pending', 'partial', 'paid', 'cancelled'],
         default: 'pending'
     },
-    dueDate: { 
-        type: Date 
+    dueDate: {
+        type: Date
     },
     notes: {
+        type: String,
+        trim: true
+    },
+    CancellationReason: {
         type: String,
         trim: true
     },
@@ -58,17 +63,23 @@ const generatedFeeSchema = new mongoose.Schema({
     updatedBy: {
         type: String
     },
-    createdAt: { 
-        type: Date, 
-        default: Date.now 
+    cancelledBy: {
+        type: String
     },
-    updatedAt: { 
-        type: Date, 
-        default: Date.now 
+    receiptedBy: {
+        type: String
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    },
+    updatedAt: {
+        type: Date,
+        default: Date.now
     }
 });
 
-generatedFeeSchema.pre('save', function(next) {
+generatedFeeSchema.pre('save', function (next) {
     this.updatedAt = new Date();
 
     // Auto-calculate status based on payments
@@ -84,12 +95,12 @@ generatedFeeSchema.pre('save', function(next) {
 });
 
 // Static method for recording payments
-generatedFeeSchema.statics.recordPayment = async function(feeId, amount, userId) {
+generatedFeeSchema.statics.recordPayment = async function (feeId, amount, userId) {
     const fee = await this.findById(feeId);
     if (!fee) throw new Error('Fee not found');
 
     fee.paidAmount += amount;
-    fee.updatedBy = userId;
+    fee.receiptedBy = userId;
 
     if (fee.paidAmount >= fee.totalAmount) {
         fee.status = 'paid';
@@ -102,7 +113,7 @@ generatedFeeSchema.statics.recordPayment = async function(feeId, amount, userId)
 };
 
 // Static method for cancelling a fee
-generatedFeeSchema.statics.cancelFee = async function(feeId, userId, reason) {
+generatedFeeSchema.statics.cancelFee = async function (feeId, userId, reason) {
     const fee = await this.findById(feeId);
     if (!fee) throw new Error('Fee not found');
 
@@ -111,8 +122,8 @@ generatedFeeSchema.statics.cancelFee = async function(feeId, userId, reason) {
     }
 
     fee.status = 'cancelled';
-    fee.notes = reason || 'Fee cancelled';
-    fee.updatedBy = userId;
+    fee.CancellationReason = reason || 'Fee cancelled';
+    fee.cancelledBy = userId;
 
     await fee.save();
     return fee;
