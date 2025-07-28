@@ -5,8 +5,8 @@ const receiptController = require('../controllers/receiptController');
 const reportController = require('../controllers/reportController');
 
 // Fee generation routes
-router.post('/fees/generate-monthly', feeController.generateMonthlyFees);
-router.get('/parents/:parentId/fees', feeController.getParentFees);
+// router.post('/fees/generate-monthly', feeController.generateMonthlyFees);
+// router.get('/parents/:parentId/fees', feeController.getParentFees);
 
 // router.get('/fees', feeController.getGeneratedFees);
 // router.get('/parents/active', feeController.getParentsWithActiveStudents);

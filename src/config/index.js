@@ -8,8 +8,8 @@ module.exports = {
   db: {
     uri: buildMongoUri(),
     options: {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      // useNewUrlParser: true,
+      // useUnifiedTopology: true,
       authSource: process.env.MONGODB_AUTH_SOURCE || 'admin',
       connectTimeoutMS: 30000,
       socketTimeoutMS: 30000,
