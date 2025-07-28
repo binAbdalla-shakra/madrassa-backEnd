@@ -64,6 +64,8 @@ app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/dashboard', require('./routes/DashboardRoutes'));
 
 app.use('/api/fee', require('./routes/feeRoutes'));
+app.use('/api/permissions', require('./routes/permissionRoutes'));
+
 
 
 
@@ -75,5 +77,5 @@ app.use('/api/customers', customerRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

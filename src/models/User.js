@@ -6,11 +6,19 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     email: { type: String, unique: true },
     roleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' }, // Reference to Role collection
+    additionalPermissions: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Permission'
+    }],
+    restrictedPermissions: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Permission'
+    }],
     madrassaId: { type: mongoose.Schema.Types.ObjectId, ref: 'madrassa', required: true },
     createdAt: { type: Date, default: Date.now },
     CreatedBy: { type: String, required: true },
-    ModifiedAt:  Date,
-    ModifiedBy:  String,
+    ModifiedAt: Date,
+    ModifiedBy: String,
 });
 
 module.exports = mongoose.model('User', userSchema);

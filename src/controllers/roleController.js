@@ -5,8 +5,8 @@ const Role = require('../models/Role');
 exports.createRole = async (req, res) => {
     try {
         const role = await Role.create(req.body);
-        res.status(201).json({data: role});
-    } catch (error) { 
+        res.status(201).json({ data: role });
+    } catch (error) {
         res.status(400).json({ error: error.message });
     }
 };
@@ -15,7 +15,7 @@ exports.createRole = async (req, res) => {
 exports.getAllRoles = async (req, res) => {
     try {
         const roles = await Role.find();
-        res.json({ data: roles });  
+        res.json({ data: roles });
 
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -26,7 +26,7 @@ exports.getAllRoles = async (req, res) => {
 exports.updateRole = async (req, res) => {
     try {
         const role = await Role.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        res.json({data: role});
+        res.json({ data: role });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -39,5 +39,20 @@ exports.deleteRole = async (req, res) => {
         res.status(204).send();
     } catch (error) {
         res.status(400).json({ error: error.message });
+    }
+};
+
+
+
+exports.assignPermissions = async (req, res) => {
+    try {
+        const role = await Role.findByIdAndUpdate(
+            req.params.roleId,
+            { $addToSet: { permissions: req.body.permissionIds } },
+            { new: true }
+        );
+        res.json(role);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
     }
 };
