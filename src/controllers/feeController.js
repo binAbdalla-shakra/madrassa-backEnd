@@ -7,10 +7,6 @@ const mongoose = require('mongoose');
 // Generate Monthly Tuition Fees
 exports.generateMonthlyFees = async (req, res) => {
     try {
-        // const errors = validationResult(req);
-        // if (!errors.isEmpty()) {
-        //     return res.status(400).json({ errors: errors.array() });
-        // }
 
         const { month, year, createdBy } = req.body;
 
@@ -37,6 +33,10 @@ exports.generateMonthlyFees = async (req, res) => {
             const parent = await Parent.findById(parentData._id);
             if (!parent) continue;
 
+            // Skip parents with 100% discount
+            if (parent.isDiscountPercent && parent.discountPercent === 100) {
+                continue;
+            }
             // Calculate base amount
             const baseAmount = tuitionFeeType.amount * parentData.studentCount;
 
