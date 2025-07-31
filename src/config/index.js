@@ -25,7 +25,7 @@ function buildMongoUri() {
   const credentials = `${encodeURIComponent(process.env.MONGODB_USER)}:${encodeURIComponent(process.env.MONGODB_PASSWORD)}`;
   const server = process.env.MONGODB_SERVER;
   const dbName = process.env.MONGODB_DB || 'Madrasa_DB';
-  return 'mongodb://127.0.0.1:27017/Madrasa_DB?directConnection=true&serverSelectionTimeoutMS=2000';
-  // return 'mongodb+srv://alvarro936:L2T7x3jFNyxbUlPX@cluster0.qrbtt6y.mongodb.net/Madrassa_development_DB?retryWrites=true&w=majority&appName=Cluster0'
+//  return 'mongodb://127.0.0.1:27017/Madrasa_DB?directConnection=true&serverSelectionTimeoutMS=2000';
+  return 'mongodb+srv://alvarro936:L2T7x3jFNyxbUlPX@cluster0.qrbtt6y.mongodb.net/Madrassa_development_DB?retryWrites=true&w=majority&appName=Cluster0'
   // return `mongodb://${credentials}@${server}/${dbName}?authSource=${process.env.MONGODB_AUTH_SOURCE || 'admin'}`;
 }
