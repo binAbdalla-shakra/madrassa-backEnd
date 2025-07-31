@@ -5,7 +5,8 @@ const {
     getAllRoles,
     updateRole,
     deleteRole,
-    assignPermissions,
+    assignPermissionsToRole,
+    getRolePermissions,
 } = require('../controllers/roleController');
 
 const router = express.Router();
@@ -15,7 +16,6 @@ router.get('/', getAllRoles);
 router.put('/:id', updateRole);
 router.delete('/:id', deleteRole);
 
-router.post('/:roleId/permissions', assignPermissions);
-
+// getPermissionsForAssignment
 
 module.exports = router;

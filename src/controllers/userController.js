@@ -1,22 +1,24 @@
 const User = require('../models/User');
-const Role = require('../models/Role'); // Import Role model
+const MenuPermission = require('../models/MenuPermission'); // Import Role model
 const bcrypt = require('bcrypt'); // Add this line to import bcrypt
 // Create User
 exports.createUser = async (req, res) => {
   try {
-    const { username, password, email, roleId, madrassaId, CreatedBy } = req.body;
+    const { username, password, email, roles, Teacher, madrassaId, CreatedBy } = req.body;
 
-    // Optionally, you may want to hash the password before saving
-    //  const hashedPassword = await bcrypt.hash(password, 10); 
+    // Validate at least one role is provided
+    if (!roles || roles.length === 0) {
+      return res.status(400).json({ error: "At least one role is required" });
+    }
 
     const user = new User({
-      username: username,
-      // password:hashedPassword, // Use hashedPassword in production
-      password: password,
-      email: email,
-      roleId: roleId,
-      madrassaId: madrassaId,
-      CreatedBy: CreatedBy,
+      username,
+      password, // Remember to hash this in production
+      email,
+      roles,
+      Teacher,
+      madrassaId,
+      CreatedBy,
     });
 
     await user.save();
@@ -26,42 +28,32 @@ exports.createUser = async (req, res) => {
   }
 };
 
-// Get All Users
+// Get All Users with populated roles
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().populate('roleId');
-
-    // Rename roleId to role for frontend clarity
-    const formattedUsers = users.map(user => {
-      const userObj = user.toObject();
-      userObj.role = userObj.roleId;
-      delete userObj.roleId;
-      return userObj;
-    });
-
-    res.json({ data: formattedUsers });
+    const users = await User.find().populate('roles');
+    res.json({ data: users });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 };
 
-
-// Update User
+// Update User (including roles)
 exports.updateUser = async (req, res) => {
   try {
-    const { id } = req.params; // Get user ID from URL
+    const { id } = req.params;
     const updateData = { ...req.body };
 
-    // // Check if the password field exists and is not empty
-    // if (updateData.password && updateData.password.trim() !== '') {
-    //     // Hash the new password
-    //     updateData.password = await bcrypt.hash(updateData.password, 10);
-    // } else {
-    //     // Remove the password field to retain the existing password
-    //     delete updateData.password;
-    // }
+    // If updating roles, ensure at least one role is provided
+    if (updateData.roles && updateData.roles.length === 0) {
+      return res.status(400).json({ error: "At least one role is required" });
+    }
 
-    const updatedUser = await User.findByIdAndUpdate(id, updateData, { new: true });
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true }
+    ).populate('roles');
 
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' });
@@ -72,6 +64,8 @@ exports.updateUser = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
+
+
 
 // Delete User
 exports.deleteUser = async (req, res) => {
@@ -88,43 +82,107 @@ exports.deleteUser = async (req, res) => {
 };
 
 
+//  get userAcccessible Menus
 exports.getUserMenu = async (req, res) => {
   try {
-    console.log("userId", req.params.userId)
     const user = await User.findById(req.params.userId)
+      .select('roles')
+      .populate('roles', 'type');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Return empty array if user has no roles
+    if (!user.roles || user.roles.length === 0) {
+      return res.json({ flatMenu: [] });
+    }
+
+    // Get all MenuPermission entries for the user's roles
+    const menuPermissions = await MenuPermission.find({
+      roleId: { $in: user.roles.map(role => role._id) }
+    })
       .populate({
-        path: 'roleId',
-        populate: { path: 'permissions' }
+        path: 'menuId',
+        select: 'label icon link parentId order',
+        options: { sort: { order: 1 } }
       })
-      .populate('additionalPermissions');
+      .populate({
+        path: 'subMenuIds',
+        select: 'label link order',
+        options: { sort: { order: 1 } }
+      });
 
-    // Combine role permissions and additional permissions
-    const allPermissions = [
-      ...(user.roleId?.permissions || []),
-      ...(user.additionalPermissions || [])
-    ];
+    // Return empty array if no permissions found
+    if (!menuPermissions || menuPermissions.length === 0) {
+      return res.json({ flatMenu: [] });
+    }
 
-    // Format to match your frontend structure
-    const menuItems = allPermissions.map(p => ({
-      id: p._id,
-      label: p.label,
-      icon: p.icon,
-      link: p.path || "/#",
-      subItems: p.subItems?.map(sub => ({
-        id: `${p._id}-${sub.path}`,
-        label: sub.label,
-        link: sub.path,
-        parentId: p._id
-      }))
-    }));
+    // Organize permissions by menuId with null checks
+    const permissionsByMenu = {};
+    menuPermissions.forEach(perm => {
+      // Skip if menuId is null or undefined
+      if (!perm.menuId) return;
 
-    res.json(menuItems);
+      if (!permissionsByMenu[perm.menuId._id]) {
+        permissionsByMenu[perm.menuId._id] = {
+          menu: perm.menuId,
+          subMenus: []
+        };
+      }
+
+      // Add submenus only if they exist
+      if (perm.subMenuIds && perm.subMenuIds.length > 0) {
+        perm.subMenuIds.forEach(subMenu => {
+          if (subMenu && !permissionsByMenu[perm.menuId._id].subMenus.some(s => s._id.equals(subMenu._id))) {
+            permissionsByMenu[perm.menuId._id].subMenus.push(subMenu);
+          }
+        });
+      }
+    });
+
+    // Get all parent menus (filter out null/undefined and sort)
+    const parentMenus = Object.values(permissionsByMenu)
+      .filter(item => item.menu && !item.menu.parentId)
+      .map(item => item.menu)
+      .sort((a, b) => a.order - b.order);
+
+    // Build hierarchical menu structure
+    const buildMenu = (parentId = null) => {
+      return parentMenus
+        .filter(menu =>
+          (menu.parentId && menu.parentId.equals(parentId)) ||
+          (!menu.parentId && !parentId)
+        )
+        .map(menu => {
+          const permission = permissionsByMenu[menu._id];
+          return {
+            id: menu._id,
+            label: menu.label,
+            icon: menu.icon,
+            link: menu.link,
+            order: menu.order,
+            subItems: (permission?.subMenus || []).map(subMenu => ({
+              id: subMenu._id,
+              label: subMenu.label,
+              link: subMenu.link,
+              parentId: menu._id,
+              order: subMenu.order
+            }))
+          };
+        });
+    };
+
+    const flatMenu = buildMenu();
+
+    res.json({
+      flatMenu: flatMenu || [] // Ensure we always return an array
+    });
   } catch (error) {
+    console.error('Error in getUserMenu:', error);
     res.status(500).json({ message: error.message });
   }
 };
-
-
 // Login controller
 exports.signin = async (req, res) => {
   try {
@@ -140,14 +198,14 @@ exports.signin = async (req, res) => {
             username: "wllka",
             email: "superadmin@example.com",
             madrassaId: "687a0e5a907e6d1c2e0862b3",
-            roleId: "superAdmin"
+            roles: ["superAdmin"]
           }
         }
       });
     }
 
     // Regular user lookup
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username }).populate('roles');
     if (!user) {
       return res.status(201).json({ status: "error", error: "Incorrect username!" });
     }
@@ -165,11 +223,10 @@ exports.signin = async (req, res) => {
           username: user.username,
           email: user.email,
           madrassaId: user.madrassaId,
-          roleId: user.roleId
+          roles: user.roles
         }
       }
     });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ status: "error", error: "Server error" });

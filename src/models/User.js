@@ -4,16 +4,18 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    email: { type: String, unique: true },
-    roleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' }, // Reference to Role collection
-    additionalPermissions: [{
+    email: { type: String },
+    roles: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Permission'
+        ref: 'Role',
+        required: true
     }],
-    restrictedPermissions: [{
+    Teacher: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Permission'
-    }],
+        ref: 'Teacher',
+        required: true
+    },
+
     madrassaId: { type: mongoose.Schema.Types.ObjectId, ref: 'madrassa', required: true },
     createdAt: { type: Date, default: Date.now },
     CreatedBy: { type: String, required: true },

@@ -15,7 +15,7 @@ exports.createRole = async (req, res) => {
 exports.getAllRoles = async (req, res) => {
     try {
         const roles = await Role.find();
-        res.json({ data: roles });
+        res.json({ success: true, data: roles });
 
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -43,16 +43,3 @@ exports.deleteRole = async (req, res) => {
 };
 
 
-
-exports.assignPermissions = async (req, res) => {
-    try {
-        const role = await Role.findByIdAndUpdate(
-            req.params.roleId,
-            { $addToSet: { permissions: req.body.permissionIds } },
-            { new: true }
-        );
-        res.json(role);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-};

@@ -5,12 +5,13 @@ const mongoose = require('mongoose');
 const roleSchema = new mongoose.Schema({
     type: { type: String, required: true }, // Role type (e.g., Admin, User)
     description: { type: String }, // Description of the role
+    madrassaId: { type: mongoose.Schema.Types.ObjectId, ref: 'madrassa', required: true },
     permissions: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Permission'
+        menu: { type: mongoose.Schema.Types.ObjectId, ref: 'Menu', required: true },
+        subMenus: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Menu' }],
+        hasAccess: { type: Boolean, default: false }
     }],
 
-    madrassaId: { type: mongoose.Schema.Types.ObjectId, ref: 'madrassa', required: true },
     createdAt: { type: Date, default: Date.now }, // Timestamp for creation date
     CreatedBy: { type: String, required: true },
     ModifiedAt: Date,
