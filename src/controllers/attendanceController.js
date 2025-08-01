@@ -1,5 +1,10 @@
 const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
+const User = require('../models/User');
+const Group = require('../models/Group');
+const GroupWithStudent = require('../models/GroupWithStudent');
+
+
 
 // Create attendance record for a student
 exports.createAttendance = async (req, res) => {
@@ -170,6 +175,86 @@ exports.createBulkAttendance = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error creating bulk attendance',
+            error: error.message
+        });
+    }
+};
+
+
+
+// Get All Students
+exports.getStudentsByTeacherGroup = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        // 1. Get the teacher ID from the user
+        const user = await User.findById(userId)
+            .select('Teacher')
+            .populate('Teacher', '_id');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'User not found'
+            });
+        }
+
+        const teacherId = user.Teacher._id;
+
+        // 2. Find all groups assigned to this teacher
+        const groups = await Group.find({ teacherId })
+            .select('_id name');
+
+        if (!groups || groups.length === 0) {
+            return res.json({
+                success: true,
+                data: [],
+                message: 'No groups found for this teacher'
+            });
+        }
+
+        const groupIds = groups.map(group => group._id);
+
+        // 3. Find all students in these groups
+        const groupStudents = await GroupWithStudent.find({
+            groupId: { $in: groupIds }
+        })
+            .populate({
+                path: 'students.studentId',
+                select: 'name rollNumber fatherName contactNumber isActive',
+                match: { isActive: true }  // Only populate active students
+            })
+            .populate('groupId', 'name');
+
+        // 4. Format the response
+        const result = groupStudents.map(group => ({
+            groupId: group.groupId._id,
+            groupName: group.groupId.name,
+            students: group.students
+                .filter(student =>
+                    !student.leaveDate && // Current students
+                    student.studentId && // Ensure student exists (from population match)
+                    student.studentId.isActive // Explicit active check
+                )
+                .map(student => ({
+                    studentId: student.studentId._id,
+                    name: student.studentId.name,
+                    rollNumber: student.studentId.rollNumber,
+                    fatherName: student.studentId.fatherName,
+                    contactNumber: student.studentId.contactNumber,
+                    joinDate: student.joinDate,
+                    isActive: student.studentId.isActive // Include active status
+                }))
+        }));
+
+        res.json({
+            success: true,
+            data: result
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
             error: error.message
         });
     }

@@ -10,4 +10,9 @@ router.put('/:id', attendanceController.updateAttendance);
 // Bulk attendance route
 router.post('/bulk', attendanceController.createBulkAttendance);
 
+
+router.get('/teacher-groups/students/:userId', attendanceController.getStudentsByTeacherGroup);
+
+
+
 module.exports = router;
