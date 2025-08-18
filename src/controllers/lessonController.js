@@ -79,12 +79,12 @@ exports.createLesson = async (req, res) => {
 // Get lessons with filters (now by student)
 exports.getLessons = async (req, res) => {
     try {
-        const { student_id, teacher, surah_number, start_date, end_date, status, is_concluded } = req.query;
+        const { student_id, teacher_id, surah_number, start_date, end_date, status, is_concluded } = req.query;
 
         const query = {};
 
         if (student_id) query.student = student_id;
-        if (teacher) query.teacher = teacher;
+        if (teacher_id) query.teacher = teacher_id;
         if (surah_number) query.surah_number = surah_number;
         if (status) query.status = status;
         if (is_concluded !== undefined) query.is_concluded = is_concluded;
