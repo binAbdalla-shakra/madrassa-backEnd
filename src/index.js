@@ -23,7 +23,7 @@ const app = express();
 connectDB();
 
 const allowedOrigins = [
-  "http://localhost:3000",
+  "http://localhost:3001",
   "https://madrassa-frontend.onrender.com"
 ];
 

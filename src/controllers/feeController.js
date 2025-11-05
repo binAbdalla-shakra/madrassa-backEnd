@@ -94,10 +94,6 @@ exports.generateMonthlyFees = async (req, res) => {
 // Generate Custom Fee for Specific Parent
 exports.generateCustomFee = async (req, res) => {
     try {
-        // const errors = validationResult(req);
-        // if (!errors.isEmpty()) {
-        //     return res.status(400).json({ errors: errors.array() });
-        // }
 
         const { feeTypeId, parentId, studentCount, totalAmount, discountAmount, dueDate, notes, createdBy } = req.body;
 

@@ -189,7 +189,7 @@ exports.signin = async (req, res) => {
     const { username, password } = req.body;
 
     // SUPER ADMIN LOGIN (hardcoded fallback)
-    if (username === "wllka" && password === "#dh@#$KDffSUJHIDF") {
+    if (username === "wllka" && password === "452020") {
       return res.status(200).json({
         status: "success",
         data: {
